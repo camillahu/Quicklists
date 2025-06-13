@@ -5,12 +5,8 @@ import { RouterOutlet } from '@angular/router';
   selector: 'app-root',
   imports: [RouterOutlet],
   template: `
-    <h1>Welcome to {{title}}!</h1>
-
     <router-outlet />
   `,
   styles: [],
 })
-export class AppComponent {
-  title = 'angularstart-quicklists';
-}
+export class AppComponent {}
