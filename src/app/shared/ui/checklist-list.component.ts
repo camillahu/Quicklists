@@ -3,17 +3,21 @@ import {Checklist} from '../interfaces/checklist';
 import {KeyValuePipe} from '@angular/common';
 
 @Component({
-  selector: "home-checklist-list",
+  selector: "app-checklist-list",
   template: `
-    @for (checklist of checklists() | keyvalue; track checklist.id) {
+    <ul>
+      @for (checklist of checklists(); track checklist.id) {
+        <li>
+            {{checklist.title}}
+        </li>
+      } @empty {
+        <p>Click the add button to create your first checklist!</p>
+      }
+    </ul>
 
-    }
   `,
-  imports: [
-    KeyValuePipe
-  ]
 })
 
 export class ChecklistListComponent {
-  checklists = input.required<Checklist[]>;
+  checklists = input.required<Checklist[]>();
 }
