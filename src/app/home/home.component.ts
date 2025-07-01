@@ -19,9 +19,12 @@ import {ChecklistListComponent} from '../shared/ui/checklist-list.component';
       <button (click)="checklistBeingEdited.set({})">Add checklist</button>
     </header>
 
-    <app-checklist-list
+    <section>
+      <h2>Your checklists</h2>
+      <app-checklist-list
         [checklists]="checklistService.checklists()"
-    />
+      />
+    </section>
 
     <app-modal [isOpen]="!!checklistBeingEdited()">
       <ng-template>
