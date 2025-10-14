@@ -5,6 +5,7 @@ import {AddChecklist, Checklist, EditChecklist} from '../interfaces/checklist';
 import {StorageService} from './storage.service';
 import {ChecklistItemService} from '../../checklist/data-access/checklist-item.service';
 import {EditChecklistItem} from '../interfaces/checklist-item';
+import {reducer} from '../utils/reducer';
 
 export interface ChecklistsState {
   checklists: Checklist[];
@@ -70,15 +71,16 @@ export class ChecklistService {
       }))
     );
 
-    this.checklistsLoaded$.pipe(takeUntilDestroyed()).subscribe({
-      next: (checklists) =>
-        this.state.update((state) => ({
-          ...state,
-          checklists,
-          loaded: true,
-        })),
-      error: (err) => this.state.update((state) => ({...state, error: err})),
-    });
+    reducer(
+      this.checklistsLoaded$,
+      (checklists) =>
+          this.state.update((state) => ({
+            ...state,
+            checklists,
+            loaded: true,
+          })),
+       (err) => this.state.update((state) => ({...state, error: err})),
+      );
   }
 
 
