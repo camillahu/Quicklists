@@ -1,11 +1,12 @@
 import {Injectable, computed, signal, inject, effect} from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
-import {Subject} from 'rxjs';
+import {map, merge, Subject} from 'rxjs';
 import {AddChecklist, Checklist, EditChecklist} from '../interfaces/checklist';
 import {StorageService} from './storage.service';
 import {ChecklistItemService} from '../../checklist/data-access/checklist-item.service';
 import {EditChecklistItem} from '../interfaces/checklist-item';
 import {reducer} from '../utils/reducer';
+import { connect } from 'ngxtension/connect';
 
 export interface ChecklistsState {
   checklists: Checklist[];
@@ -35,52 +36,41 @@ export class ChecklistService {
   add$ = new Subject<AddChecklist>();
   remove$ = this.checklistItemService.checklistRemoved$;
   edit$ = new Subject<EditChecklist>();
+  private error$ = new Subject<string>();
   private checklistsLoaded$ = this.storageService.loadChecklists();
 
   constructor() {
+
+    const nextState$ = merge(
+      this.checklistsLoaded$.pipe(
+        map((checklists) =>
+          ({checklists, loaded: true}))
+      ),
+      this.error$.pipe(map((error) => ({ error })))
+    ); //combining sources that don't need a reducer function first(this can be skipped)
+
+    connect(this.state)
+      .with(nextState$)
+      .with(this.add$, (state, checklist) => ({
+        checklists: [...state.checklists, this.addIdToChecklist(checklist)]
+      }))
+      .with(this.remove$, (state, id) => ({
+        checklists: state.checklists.filter((checklist) => checklist.id !== id),
+      }))
+      .with(this.edit$, (state, update) => ({
+        checklists: state.checklists.map((checklist) =>
+        checklist.id === update.id
+          ? {...checklist, title: update.data.title }
+          : checklist
+        ),
+      })) //chain on with for each source that needs a reducer
+
     //effects
     effect(() => {
       if (this.loaded()) {
         this.storageService.saveChecklists(this.checklists());
       }
     });
-
-    //reducers
-    this.add$.pipe(takeUntilDestroyed()).subscribe((checklist) =>
-      this.state.update((state) => ({
-        ...state,
-        checklists: [...state.checklists, this.addIdToChecklist(checklist)]
-      }))
-    );
-
-    this.remove$.pipe(takeUntilDestroyed()).subscribe((id) =>
-    this.state.update((state) => ({
-      ...state,
-      checklists: state.checklists.filter((checklist) => checklist.id !== id)
-    }))
-    );
-
-    this.edit$.pipe(takeUntilDestroyed()).subscribe((update) =>
-      this.state.update((state) => ({
-        ...state,
-        checklists: state.checklists.map((checklist) =>
-        checklist.id === update.id
-        ? {...checklist, title: update.data.title}
-        : checklist
-        ),
-      }))
-    );
-
-    reducer(
-      this.checklistsLoaded$,
-      (checklists) =>
-          this.state.update((state) => ({
-            ...state,
-            checklists,
-            loaded: true,
-          })),
-       (err) => this.state.update((state) => ({...state, error: err})),
-      );
   }
 
 

@@ -5,11 +5,11 @@ import {
   RemoveChecklistItem
 } from '../../shared/interfaces/checklist-item';
 import {computed, effect, inject, Injectable, signal} from '@angular/core';
-import {Subject, take} from 'rxjs';
+import {map, merge, Subject, take} from 'rxjs';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {RemoveChecklist} from '../../shared/interfaces/checklist';
 import {StorageService} from '../../shared/data-access/storage.service';
-
+import { connect } from 'ngxtension/connect';
 
 export interface ChecklistItemsState {
   checklistItems: ChecklistItem[];
@@ -45,16 +45,18 @@ export class ChecklistItemService {
   private checklistItemsLoaded$ = this.storageService.loadChecklistItems();
 
   constructor() {
-    // effects
-    effect(() => {
-      if (this.loaded()) {
-        this.storageService.saveChecklistItems(this.checklistItems())
-      }
-    });
+    const nextState$ = merge(
+      this.checklistItemsLoaded$.pipe(
+        map((checklistItems) =>({
+          checklistItems,
+          loaded: true
+        }))
+      )
+    );
 
-    this.add$.pipe(takeUntilDestroyed()).subscribe((checklistItem) =>
-      this.state.update((state) => ({
-        ...state,
+    connect(this.state)
+      .with(nextState$)
+      .with(this.add$, (state, checklistItem) => ({
         checklistItems: [
           ...state.checklistItems,
           {
@@ -65,62 +67,34 @@ export class ChecklistItemService {
           },
         ],
       }))
-    );
-    this.toggle$.pipe(takeUntilDestroyed()).subscribe((checklistItemId) =>
-      this.state.update((state) => ({
-        ...state,
+      .with(this.edit$, (state, update) => ({
         checklistItems: state.checklistItems.map((item) =>
-          item.id === checklistItemId
-            ? {...item, checked: !item.checked}
-            : item
+        item.id === update.id ? {...item, title: update.data.title } : item
         ),
       }))
-    );
-    this.reset$.pipe(takeUntilDestroyed()).subscribe((checklistId) =>
-      this.state.update((state) => ({
-        ...state,
+      .with(this.toggle$, (state, checklistItemId) => ({
+      checklistItems: state.checklistItems.map((item) =>
+      item.id === checklistItemId
+      ? {...item, checked: !item.checked }
+      : item
+      ),
+    }))
+      .with(this.reset$, (state, checklistId) => ({
         checklistItems: state.checklistItems.map((item) =>
-          item.checklistId === checklistId
-            ? {...item, checked: false}
-            : item
+        item.checklistId === checklistId ? { ...item, checked: false} : item
         ),
       }))
-    );
-    this.edit$.pipe(takeUntilDestroyed()).subscribe((update) => {
-      this.state.update((state) => ({
-        ...state,
-        checklistItems: state.checklistItems.map((item) =>
-          item.id === update.id
-            ? {...item, title: update.data.title}
-            : item
-        )
-      }))
-    });
-
-    this.remove$.pipe(takeUntilDestroyed()).subscribe((checklistItemId) => {
-      this.state.update((state) => ({
-        ...state,
-        checklistItems: state.checklistItems.filter((item) => item.id !== checklistItemId)
-      }))
-    });
-
-    this.checklistRemoved$.pipe(takeUntilDestroyed()).subscribe((checklistId) =>
-      this.state.update((state) => ({
-        ...state,
-        checklistItems: state.checklistItems.filter((item) =>
-          item.checklistId !== checklistId
+      .with(this.checklistRemoved$, (state, checklistId) => ({
+        checklistItems: state.checklistItems.filter(
+          (item) => item.checklistId !== checklistId
         ),
-      }))
-    );
+      }));
 
-    this.checklistItemsLoaded$.pipe(takeUntilDestroyed()).subscribe({
-      next: (checklistItems) =>
-        this.state.update((state) => ({
-          ...state,
-          checklistItems,
-          loaded: true
-        })),
-      error: (err) => this.state.update((state) => ({...state, error: err})),
+    // effects
+    effect(() => {
+      if (this.loaded()) {
+        this.storageService.saveChecklistItems(this.checklistItems())
+      }
     });
   }
 }
